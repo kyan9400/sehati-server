@@ -1,0 +1,39 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+    branches: [master]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: lts/*
+          cache: npm
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Syntax check
+        run: |
+          for f in server.js routes/auth.js models/User.js; do
+            node --check "$f"
+          done
+
+      - name: Smoke test (server boots and answers GET /)
+        env:
+          PORT: 5055
+          MONGO_URI: ""
+          JWT_SECRET: ci-smoke-test
+        run: |
+          node server.js &
+          SERVER_PID=$!
+          curl --fail --silent --show-error --retry 10 --retry-connrefused --retry-delay 1 http://localhost:5055/
+          echo
+          kill "$SERVER_PID"
